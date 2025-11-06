@@ -1,14 +1,13 @@
-# server_oop.py
-# Centralized Index Server for P2P File Sharing (OOP version)
-
 import socket
 import threading
 import os 
 import time
+
+# --- SERVER CONFIGURATION ---
 DEFAULT_HOST = '127.0.0.1'
 DEFAULT_PORT = 9000
 BUFFER_SIZE = 1024
-
+# ----------------------------
 
 class FileIndex:
     """

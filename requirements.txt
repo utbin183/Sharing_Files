@@ -1,4 +1,6 @@
 socket
 threading
 os
-subprocessing
+time 
+queue
+subprocess

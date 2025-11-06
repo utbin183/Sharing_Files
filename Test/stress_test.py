@@ -1,10 +1,3 @@
-"""
-Stress Test for P2P File Sharing System with Multiple Peers
-- Multiple peers (default 3)
-- Publish, fetch, list, unpublish operations
-- Measure latency per operation
-"""
-
 import subprocess
 import time
 import os

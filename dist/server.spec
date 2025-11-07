@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['build\\server.py'],
+    ['app\\server.py'],
     pathex=[],
     binaries=[],
     datas=[],

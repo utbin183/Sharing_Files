@@ -14,7 +14,7 @@ BUFFER_SIZE = 1024
 # -----------------------------
 
 
-class NetworkUtils:
+class NetworkHandler:
     """Handles network utility operations like checking connectivity."""
 
     @staticmethod
@@ -189,7 +189,7 @@ class P2PClient:
     def monitor_network(self):
         """Continuously monitor internet connection, auto-shutdown if lost."""
         while True:
-            if not NetworkUtils.check_network_connection():
+            if not NetworkHandler.check_network_connection():
                 print("\n[NETWORK ERROR] Lost internet connection. Shutting down client.")
                 os._exit(1)
             time.sleep(5)
@@ -234,7 +234,7 @@ class P2PClient:
 
         try:
             while True:
-                if not NetworkUtils.check_network_connection():
+                if not NetworkHandler.check_network_connection():
                     print("[NETWORK ERROR] Lost connection. Exiting client.")
                     break
                 try: 
@@ -338,15 +338,15 @@ class P2PClient:
             server_socket.close()
 
 def safe_input(prompt):
-    if not NetworkUtils.check_network_connection():
+    if not NetworkHandler.check_network_connection():
         print("[ERROR] Network disconnected. Exiting client.")
         os._exit(1)
     return input(prompt)
 
 if __name__ == "__main__":
-    print("=== P2P Client (OOP) ===")
+    print("=== P2P Client ===")
 
-    if not NetworkUtils.check_network_connection():
+    if not NetworkHandler.check_network_connection():
         print("[ERROR] No network connection detected. Client cannot start.")
         exit(1)
 
@@ -368,7 +368,7 @@ if __name__ == "__main__":
 
     CLIENT_REPO_PATH = f'client_{PEER_PORT}_files'
 
-    if not NetworkUtils.check_network_connection():
+    if not NetworkHandler.check_network_connection():
         print("[ERROR] Network disconnected. Cannot start client.")
         exit(1)
 

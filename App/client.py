@@ -10,7 +10,7 @@ SERVER_PORT = 9000
 PEER_PORT = 9001
 CLIENT_REPO_PATH = 'client_files'
 local_repository = {}
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 8192
 # -----------------------------
 
 
@@ -69,7 +69,27 @@ class PeerServer:
                 else:
                     peer_connection.sendall(b'FILE_NOT_FOUND')
                     print(f"[PEER UPLOAD] Error: File not in repository: {file_name}")
-
+            
+            elif parts[0].upper() == 'PING':
+                print(f"\n[PEER REQUEST] Received PING from {peer_address}")
+                peer_connection.sendall(b'PONG')
+                time.sleep(0.1)
+            
+            elif parts[0].upper() == 'DISCOVER':
+                print(f"\n[PEER REQUEST] Received DISCOVER from {peer_address}")
+                response_bytes = b'' 
+                if not self.local_repository:
+                    response_bytes = b'DISCOVER_NO_FILES'
+                else:
+                    # Send a list of file names, separated by newlines
+                    files = '\n'.join(self.local_repository.keys())
+                    response = f"DISCOVER_OK\n{files}"
+                    response_bytes = response.encode('utf-8')
+                
+                peer_connection.sendall(response_bytes)
+                time.sleep(0.1) 
+            else:
+                peer_connection.sendall(b'PEER_UNKNOWN_COMMAND')
         except Exception as e:
             print(f"\n[PEER ERROR] Error handling peer {peer_address}: {e}")
         finally:
@@ -193,7 +213,81 @@ class P2PClient:
                 print("\n[NETWORK ERROR] Lost internet connection. Shutting down client.")
                 os._exit(1)
             time.sleep(5)
+    def ping_peer(self, peer_address_str):
+        """Attempts to PING a peer directly."""
+        peer_socket = None
+        try:
+            # Assumes peer_address_str is "ip:port"
+            peer_ip, peer_port_str = peer_address_str.split(':')
+            peer_port = int(peer_port_str)
             
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.settimeout(3.0) 
+            
+            print(f"[PING] Pinging {peer_address_str}...")
+            peer_socket.connect((peer_ip, peer_port))
+            peer_socket.sendall(b'PING')
+            
+            response = peer_socket.recv(BUFFER_SIZE)
+            if response == b'PONG':
+                print(f"[PING] SUCCESS: {peer_address_str} is ALIVE.")
+            else:
+                print(f"[PING] FAILED: Peer sent unexpected response: {response.decode('utf-8')}")
+                
+        except socket.timeout:
+            print(f"[PING] FAILED: {peer_address_str} is OFFLINE (timeout).")
+        except ConnectionRefusedError:
+            print(f"[PING] FAILED: {peer_address_str} is OFFLINE (connection refused).")
+        except Exception as e:
+            print(f"[PING] ERROR: {e}")
+        finally:
+            if peer_socket:
+                peer_socket.close()
+    
+    def discover_peer(self, peer_address_str):
+        """Attempts to DISCOVER the file list from a peer directly."""
+        peer_socket = None
+        try:
+            peer_ip, peer_port_str = peer_address_str.split(':')
+            peer_port = int(peer_port_str)
+            
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.settimeout(5.0) # 5 second timeout
+            
+            print(f"[DISCOVER] Requesting file list from {peer_address_str}...")
+            peer_socket.connect((peer_ip, peer_port))
+            peer_socket.sendall(b'DISCOVER')
+            
+            # Receive the full response. The peer will close the connection when done.
+            full_response = b''
+            while True:
+                chunk = peer_socket.recv(BUFFER_SIZE)
+                if not chunk:
+                    break
+                full_response += chunk
+            
+            response = full_response.decode('utf-8')
+
+            if response == 'DISCOVER_NO_FILES':
+                print(f"[DISCOVER] Peer {peer_address_str} has no files.")
+            elif response.startswith('DISCOVER_OK\n'):
+                files_list = response.split('\n', 1)[1]
+                print(f"[DISCOVER] Files from {peer_address_str}:\n---")
+                print(files_list)
+                print("---")
+            else:
+                print(f"[DISCOVER] FAILED: Peer sent unexpected response: '{response}'")
+                
+        except socket.timeout:
+            print(f"[DISCOVER] FAILED: {peer_address_str} is OFFLINE (timeout).")
+        except ConnectionRefusedError:
+            print(f"[DISCOVER] FAILED: {peer_address_str} is OFFLINE (connection refused).")
+        except Exception as e:
+            print(f"[DISCOVER] ERROR: {e}")
+        finally:
+            if peer_socket:
+                peer_socket.close()
+                
     def run_shell(self):
         """
         Main client function. Runs the user command shell 
@@ -305,7 +399,18 @@ class P2PClient:
                         print("[LIST] No files published yet.")
                     else:
                         print("[LIST] Files on server:\n" + response)
-
+                        
+                elif command == 'ping' and len(parts) == 2:
+                    peer_address_str = parts[1]
+                    ping_thread = threading.Thread(target=self.ping_peer, args=(peer_address_str,), daemon=True)
+                    ping_thread.start()
+                    
+                elif command == 'discover' and len(parts) == 2:
+                    peer_address_str = parts[1]
+                    discover_thread = threading.Thread(target=self.discover_peer, args=(peer_address_str,), daemon=True)
+                    discover_thread.start()
+                
+                
                 elif command == 'unpublish' and len(parts) >= 2:
                     file_names = parts[1:]
                     for file_name in file_names:
@@ -330,6 +435,8 @@ class P2PClient:
                     print("unpublish <file_name>")
                     print("fetch <file_name>")
                     print("list")
+                    print("ping <ip:port>")
+                    print("discover <ip:port>")
                     print("exit")
 
         except KeyboardInterrupt:
